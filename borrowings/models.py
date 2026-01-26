@@ -23,15 +23,17 @@ class Borrowing(models.Model):
     actual_return_date = models.DateField(null=True, blank=True)
 
     class Meta:
-        ordering = ["-borrow_date"]
+        ordering = ["-borrow_date", "-id"]
 
     def clean(self):
-        if self.expected_return_date < self.borrow_date:
+        borrow_date = self.borrow_date or now().date()
+
+        if self.expected_return_date < borrow_date:
             raise ValidationError(
                 "Expected return date cannot be earlier than borrow date."
             )
 
-        if self.actual_return_date and self.actual_return_date < self.borrow_date:
+        if self.actual_return_date and self.actual_return_date < borrow_date:
             raise ValidationError(
                 "Actual return date cannot be earlier than borrow date."
             )
