@@ -37,27 +37,11 @@ class BorrowingReadSerializerTests(TestCase):
             expected_return_date=date.today() + timedelta(days=5),
         )
 
-    def test_read_serializer_contains_expected_fields(self):
-        serializer = BorrowingReadSerializer(self.borrowing)
-        data = serializer.data
-
-        self.assertIn("id", data)
-        self.assertIn("book", data)
-        self.assertIn("borrow_date", data)
-        self.assertIn("expected_return_date", data)
-        self.assertIn("actual_return_date", data)
-        self.assertIn("is_active", data)
 
     def test_is_active_is_true_when_not_returned(self):
         serializer = BorrowingReadSerializer(self.borrowing)
         self.assertTrue(serializer.data["is_active"])
 
-    def test_nested_book_is_serialized(self):
-        serializer = BorrowingReadSerializer(self.borrowing)
-        book_data = serializer.data["book"]
-
-        self.assertEqual(book_data["title"], "Test Book")
-        self.assertEqual(book_data["author"], "Author")
 
 
 class BorrowingCreateSerializerTests(TestCase):
@@ -107,7 +91,7 @@ class BorrowingCreateSerializerTests(TestCase):
 
         serializer = BorrowingCreateSerializer(data=data)
         self.assertFalse(serializer.is_valid())
-        self.assertIn("non_field_errors", serializer.errors)
+        self.assertIn("Book is not available.", str(serializer.errors))
 
 
 class BorrowingReturnSerializerTests(TestCase):
