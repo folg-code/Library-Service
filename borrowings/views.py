@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.db import transaction
 from django.utils.timezone import now
 from rest_framework import viewsets, status
@@ -12,6 +14,10 @@ from .serializers import (
     BorrowingReturnSerializer,
 )
 from books.models import Book
+
+from payments.models import Payment
+from payments.services import create_checkout_session
+
 
 
 class BorrowingViewSet(viewsets.ModelViewSet):
@@ -55,9 +61,24 @@ class BorrowingViewSet(viewsets.ModelViewSet):
             book.inventory -= 1
             book.save()
 
-            serializer.save(
+            borrowing = serializer.save(
                 user=self.request.user,
                 borrow_date=now().date(),
+            )
+
+            amount = int(book.daily_fee * Decimal("100"))
+
+            session = create_checkout_session(
+                borrowing=borrowing,
+                amount=amount,
+            )
+
+            Payment.objects.create(
+                borrowing=borrowing,
+                type=Payment.Type.PAYMENT,
+                money_to_pay=book.daily_fee,
+                session_url=session.url,
+                session_id=session.id,
             )
 
     @action(
