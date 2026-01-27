@@ -36,3 +36,27 @@ class BorrowingViewSet(viewsets.ModelViewSet):
 
         return queryset
 
+    def get_serializer_class(self):
+        if self.action == "create":
+            return BorrowingCreateSerializer
+        if self.action == "return_book":
+            return BorrowingReturnSerializer
+        return BorrowingReadSerializer
+
+    def perform_create(self, serializer):
+        with transaction.atomic():
+            book = Book.objects.select_for_update().get(
+                id=serializer.validated_data["book"].id
+            )
+
+            if book.inventory <= 0:
+                raise ValueError("Book is not available.")
+
+            book.inventory -= 1
+            book.save()
+
+            serializer.save(
+                user=self.request.user,
+                borrow_date=now().date(),
+            )
+
