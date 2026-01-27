@@ -60,3 +60,30 @@ class BorrowingViewSet(viewsets.ModelViewSet):
                 borrow_date=now().date(),
             )
 
+    @action(
+        methods=["post"],
+        detail=True,
+        url_path="return",
+    )
+    def return_book(self, request, pk=None):
+        borrowing = self.get_object()
+        serializer = self.get_serializer(
+            borrowing,
+            data=request.data,
+        )
+        serializer.is_valid(raise_exception=True)
+
+        with transaction.atomic():
+            borrowing.actual_return_date = now().date()
+            borrowing.save()
+
+            book = Book.objects.select_for_update().get(
+                id=borrowing.book.id
+            )
+            book.inventory += 1
+            book.save()
+
+        return Response(
+            BorrowingReadSerializer(borrowing).data,
+            status=status.HTTP_200_OK,
+        )
