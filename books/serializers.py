@@ -18,3 +18,15 @@ class BookReadSerializer(serializers.ModelSerializer):
 
     def get_is_available(self, obj):
         return obj.inventory > 0
+
+
+class BookWriteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Book
+        fields = (
+            "title",
+            "author",
+            "cover",
+            "inventory",
+            "daily_fee",
+        )
