@@ -8,4 +8,5 @@ router.register("", PaymentsViewSet, basename="payments")
 urlpatterns = router.urls + [
     path("success/", PaymentSuccessView.as_view(), name="payment-success"),
     path("cancel/", PaymentCancelView.as_view(), name="payment-cancel"),
+    path("webhooks/stripe/", StripeWebhookView.as_view(), name="stripe-webhook"),
 ]
