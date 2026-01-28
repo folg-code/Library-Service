@@ -44,3 +44,9 @@ class StripeWebhookView(View):
 
         payment.status = Payment.Status.PAID
         payment.save(update_fields=["status"])
+
+        notify.delay(
+            f"💰 <b>Payment completed</b>\n"
+            f"Borrowing ID: {payment.borrowing_id}\n"
+            f"Amount: ${payment.money_to_pay}"
+        )
