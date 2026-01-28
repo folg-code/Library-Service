@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.db import transaction
 from django.utils.timezone import now
 from rest_framework import viewsets, status
@@ -12,6 +14,10 @@ from .serializers import (
     BorrowingReturnSerializer,
 )
 from books.models import Book
+
+from payments.models import Payment
+from payments.services import create_checkout_session
+
 
 
 class BorrowingViewSet(viewsets.ModelViewSet):
@@ -55,33 +61,65 @@ class BorrowingViewSet(viewsets.ModelViewSet):
             book.inventory -= 1
             book.save()
 
-            serializer.save(
+            borrowing = serializer.save(
                 user=self.request.user,
                 borrow_date=now().date(),
             )
 
-    @action(
-        methods=["post"],
-        detail=True,
-        url_path="return",
-    )
+            amount = int(book.daily_fee * Decimal("100"))
+
+            session = create_checkout_session(
+                borrowing=borrowing,
+                amount=amount,
+            )
+
+            Payment.objects.create(
+                borrowing=borrowing,
+                type=Payment.Type.PAYMENT,
+                money_to_pay=book.daily_fee,
+                session_url=session.url,
+                session_id=session.id,
+            )
+
+    @action(methods=["post"], detail=True, url_path="return")
     def return_book(self, request, pk=None):
         borrowing = self.get_object()
-        serializer = self.get_serializer(
-            borrowing,
-            data=request.data,
-        )
+        serializer = self.get_serializer(borrowing, data=request.data)
         serializer.is_valid(raise_exception=True)
 
         with transaction.atomic():
-            borrowing.actual_return_date = now().date()
-            borrowing.save()
+            returned_date = now().date()
+            borrowing.actual_return_date = returned_date
+            borrowing.save(update_fields=["actual_return_date"])
 
-            book = Book.objects.select_for_update().get(
-                id=borrowing.book.id
-            )
+            book = Book.objects.select_for_update().get(id=borrowing.book.id)
             book.inventory += 1
-            book.save()
+            book.save(update_fields=["inventory"])
+
+            overdue_days = calculate_overdue_days(
+                expected=borrowing.expected_return_date,
+                returned=returned_date,
+            )
+
+            if overdue_days > 0:
+                fine_amount = (
+                        Decimal(overdue_days)
+                        * book.daily_fee
+                        * Decimal(settings.FINE_MULTIPLIER)
+                )
+
+                session = create_checkout_session(
+                    borrowing=borrowing,
+                    amount=int(fine_amount * 100),
+                )
+
+                Payment.objects.create(
+                    borrowing=borrowing,
+                    type=Payment.Type.FINE,
+                    money_to_pay=fine_amount,
+                    session_id=session.id,
+                    session_url=session.url,
+                )
 
         return Response(
             BorrowingReadSerializer(borrowing).data,
