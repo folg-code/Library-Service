@@ -81,28 +81,45 @@ class BorrowingViewSet(viewsets.ModelViewSet):
                 session_id=session.id,
             )
 
-    @action(
-        methods=["post"],
-        detail=True,
-        url_path="return",
-    )
+    @action(methods=["post"], detail=True, url_path="return")
     def return_book(self, request, pk=None):
         borrowing = self.get_object()
-        serializer = self.get_serializer(
-            borrowing,
-            data=request.data,
-        )
+        serializer = self.get_serializer(borrowing, data=request.data)
         serializer.is_valid(raise_exception=True)
 
         with transaction.atomic():
-            borrowing.actual_return_date = now().date()
-            borrowing.save()
+            returned_date = now().date()
+            borrowing.actual_return_date = returned_date
+            borrowing.save(update_fields=["actual_return_date"])
 
-            book = Book.objects.select_for_update().get(
-                id=borrowing.book.id
-            )
+            book = Book.objects.select_for_update().get(id=borrowing.book.id)
             book.inventory += 1
-            book.save()
+            book.save(update_fields=["inventory"])
+
+            overdue_days = calculate_overdue_days(
+                expected=borrowing.expected_return_date,
+                returned=returned_date,
+            )
+
+            if overdue_days > 0:
+                fine_amount = (
+                        Decimal(overdue_days)
+                        * book.daily_fee
+                        * Decimal(settings.FINE_MULTIPLIER)
+                )
+
+                session = create_checkout_session(
+                    borrowing=borrowing,
+                    amount=int(fine_amount * 100),
+                )
+
+                Payment.objects.create(
+                    borrowing=borrowing,
+                    type=Payment.Type.FINE,
+                    money_to_pay=fine_amount,
+                    session_id=session.id,
+                    session_url=session.url,
+                )
 
         return Response(
             BorrowingReadSerializer(borrowing).data,
