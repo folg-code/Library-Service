@@ -81,6 +81,13 @@ class BorrowingViewSet(viewsets.ModelViewSet):
                 session_id=session.id,
             )
 
+            transaction.on_commit(lambda: notify.delay(
+                f"📚 <b>New borrowing</b>\n"
+                f"User: {borrowing.user.email}\n"
+                f"Book: {borrowing.book.title}\n"
+                f"Due: {borrowing.expected_return_date}"
+            ))
+
     @action(methods=["post"], detail=True, url_path="return")
     def return_book(self, request, pk=None):
         borrowing = self.get_object()
@@ -120,6 +127,20 @@ class BorrowingViewSet(viewsets.ModelViewSet):
                     session_id=session.id,
                     session_url=session.url,
                 )
+
+                transaction.on_commit(lambda: notify.delay(
+                    f"⚠️ <b>Overdue fine created</b>\n"
+                    f"User: {borrowing.user.email}\n"
+                    f"Book: {borrowing.book.title}\n"
+                    f"Fine: ${fine_amount}"
+                ))
+
+        transaction.on_commit(lambda: notify.delay(
+            f"🔄 <b>Borrowing returned</b>\n"
+            f"User: {borrowing.user.email}\n"
+            f"Book: {borrowing.book.title}\n"
+            f"Returned: {borrowing.actual_return_date}"
+        ))
 
         return Response(
             BorrowingReadSerializer(borrowing).data,
