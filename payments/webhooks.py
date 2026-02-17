@@ -5,7 +5,7 @@ from django.http import HttpResponse
 from django.views import View
 
 from .models import Payment
-from notifications.tasks import notify
+from notifications.tasks import notify, notify_payment_completed
 
 
 class StripeWebhookView(View):
