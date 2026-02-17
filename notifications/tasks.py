@@ -1,5 +1,6 @@
 from celery import shared_task
 
+from borrowings.models import Borrowing
 from payments.models import Payment
 from .services import send_telegram_message
 
@@ -57,6 +58,28 @@ def notify_payment_completed(payment_id: int) -> None:
         f"Borrowing ID: {payment.borrowing_id}\n"
         f"User: {payment.borrowing.user.email}\n"
         f"Amount: ${payment.money_to_pay}"
+    )
+
+    send_telegram_message(message)
+
+@shared_task
+def notify_borrowing_created(borrowing_id: int) -> None:
+    borrowing = (
+        Borrowing.objects
+        .select_related("book", "user")
+        .filter(id=borrowing_id)
+        .first()
+    )
+
+    if not borrowing:
+        return
+
+    message = (
+        "📚 <b>New borrowing created</b>\n"
+        f"Borrowing ID: {borrowing.id}\n"
+        f"User: {borrowing.user.email}\n"
+        f"Book: {borrowing.book.title}\n"
+        f"Expected return: {borrowing.expected_return_date}"
     )
 
     send_telegram_message(message)
