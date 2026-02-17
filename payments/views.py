@@ -30,6 +30,12 @@ class PaymentSuccessView(APIView):
     def get(self, request):
         session_id = request.query_params.get("session_id")
 
+        if not session_id:
+            return Response(
+                {"detail": "Session ID is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         payment = Payment.objects.filter(
             session_id=session_id
         ).first()
@@ -40,10 +46,16 @@ class PaymentSuccessView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        payment.status = Payment.Status.PAID
-        payment.save()
+        if payment.status == Payment.Status.PAID:
+            return Response(
+                {"detail": "Payment confirmed"},
+                status=status.HTTP_200_OK,
+            )
 
-        return Response({"detail": "Payment successful"})
+        return Response(
+            {"detail": "Payment not completed yet"},
+            status=status.HTTP_200_OK,
+        )
 
 
 class PaymentCancelView(APIView):
