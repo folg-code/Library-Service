@@ -83,3 +83,68 @@ def notify_borrowing_created(borrowing_id: int) -> None:
     )
 
     send_telegram_message(message)
+
+@shared_task
+def notify_borrowing_created(borrowing_id: int) -> None:
+    borrowing = (
+        Borrowing.objects
+        .select_related("book", "user")
+        .filter(id=borrowing_id)
+        .first()
+    )
+
+    if not borrowing:
+        return
+
+    message = (
+        "📚 <b>New borrowing created</b>\n"
+        f"User: {borrowing.user.email}\n"
+        f"Book: {borrowing.book.title}\n"
+        f"Due: {borrowing.expected_return_date}"
+    )
+
+    send_telegram_message(message)
+
+
+@shared_task
+def notify_borrowing_returned(borrowing_id: int) -> None:
+    borrowing = (
+        Borrowing.objects
+        .select_related("book", "user")
+        .filter(id=borrowing_id)
+        .first()
+    )
+
+    if not borrowing:
+        return
+
+    message = (
+        "🔄 <b>Borrowing returned</b>\n"
+        f"User: {borrowing.user.email}\n"
+        f"Book: {borrowing.book.title}\n"
+        f"Returned: {borrowing.actual_return_date}"
+    )
+
+    send_telegram_message(message)
+
+
+@shared_task
+def notify_overdue_fine_created(payment_id: int) -> None:
+    payment = (
+        Payment.objects
+        .select_related("borrowing", "borrowing__book", "borrowing__user")
+        .filter(id=payment_id)
+        .first()
+    )
+
+    if not payment:
+        return
+
+    message = (
+        "⚠️ <b>Overdue fine created</b>\n"
+        f"User: {payment.borrowing.user.email}\n"
+        f"Book: {payment.borrowing.book.title}\n"
+        f"Fine: ${payment.money_to_pay}"
+    )
+
+    send_telegram_message(message)
