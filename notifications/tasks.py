@@ -1,4 +1,5 @@
 from celery import shared_task
+from django.utils.timezone import now
 
 from borrowings.models import Borrowing
 from payments.models import Payment
@@ -148,3 +149,30 @@ def notify_overdue_fine_created(payment_id: int) -> None:
     )
 
     send_telegram_message(message)
+
+@shared_task
+def check_overdue_borrowings() -> None:
+    today = now().date()
+
+    overdue = (
+        Borrowing.objects
+        .select_related("book", "user")
+        .filter(
+            expected_return_date__lt=today,
+            actual_return_date__isnull=True,
+        )
+    )
+
+    if not overdue.exists():
+        send_telegram_message("✅ <b>No borrowings overdue today!</b>")
+        return
+
+    for borrowing in overdue:
+        message = (
+            "⏰ <b>Overdue borrowing detected</b>\n"
+            f"User: {borrowing.user.email}\n"
+            f"Book: {borrowing.book.title}\n"
+            f"Due date: {borrowing.expected_return_date}"
+        )
+
+        send_telegram_message(message)
