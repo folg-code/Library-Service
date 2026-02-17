@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from django.conf import settings
 from django.db import transaction
 from django.utils.timezone import now
 from rest_framework import viewsets, status
@@ -7,6 +8,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from notifications.tasks import  notify_borrowing_created, notify_borrowing_returned, notify_overdue_fine_created
 from .models import Borrowing
 from .serializers import (
     BorrowingReadSerializer,
@@ -17,7 +19,7 @@ from books.models import Book
 
 from payments.models import Payment
 from payments.services import create_checkout_session
-
+from .services import calculate_overdue_days
 
 
 class BorrowingViewSet(viewsets.ModelViewSet):
@@ -81,12 +83,9 @@ class BorrowingViewSet(viewsets.ModelViewSet):
                 session_id=session.id,
             )
 
-            transaction.on_commit(lambda: notify.delay(
-                f"📚 <b>New borrowing</b>\n"
-                f"User: {borrowing.user.email}\n"
-                f"Book: {borrowing.book.title}\n"
-                f"Due: {borrowing.expected_return_date}"
-            ))
+            transaction.on_commit(
+                lambda: notify_borrowing_created.delay(borrowing.id)
+            )
 
     @action(methods=["post"], detail=True, url_path="return")
     def return_book(self, request, pk=None):
@@ -128,19 +127,13 @@ class BorrowingViewSet(viewsets.ModelViewSet):
                     session_url=session.url,
                 )
 
-                transaction.on_commit(lambda: notify.delay(
-                    f"⚠️ <b>Overdue fine created</b>\n"
-                    f"User: {borrowing.user.email}\n"
-                    f"Book: {borrowing.book.title}\n"
-                    f"Fine: ${fine_amount}"
-                ))
+                transaction.on_commit(
+                    lambda: notify_overdue_fine_created.delay(borrowing.id)
+                )
 
-        transaction.on_commit(lambda: notify.delay(
-            f"🔄 <b>Borrowing returned</b>\n"
-            f"User: {borrowing.user.email}\n"
-            f"Book: {borrowing.book.title}\n"
-            f"Returned: {borrowing.actual_return_date}"
-        ))
+        transaction.on_commit(
+            lambda: notify_borrowing_returned.delay(borrowing.id)
+        )
 
         return Response(
             BorrowingReadSerializer(borrowing).data,
