@@ -1,6 +1,7 @@
 from django.urls import path
 from rest_framework.routers import DefaultRouter
 from .views import PaymentsViewSet, PaymentSuccessView, PaymentCancelView
+from .webhooks import StripeWebhookView
 
 router = DefaultRouter()
 router.register("", PaymentsViewSet, basename="payments")
