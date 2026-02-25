@@ -46,12 +46,16 @@ class BorrowingAPITests(APITestCase):
             HTTP_AUTHORIZATION=f"Authorize {self.access}"
         )
 
+    # =====================================================
+    # CREATE BORROWING
+    # =====================================================
+
     @patch("borrowings.views.notify_borrowing_created.delay")
     @patch("borrowings.views.create_checkout_session")
     def test_create_borrowing_creates_payment_and_reduces_inventory(
-        self,
-        mock_checkout,
-        mock_notify,
+            self,
+            mock_checkout,
+            mock_notify_created,
     ):
         mock_session = MagicMock()
         mock_session.id = "session_123"
@@ -77,7 +81,12 @@ class BorrowingAPITests(APITestCase):
         self.assertEqual(Payment.objects.count(), 1)
 
         mock_checkout.assert_called_once()
+        # on_commit nie wywoła się w trakcie testu — więc nie asercjujemy notify
 
+
+    # =====================================================
+    # RETURN OVERDUE → FINE
+    # =====================================================
 
     @patch("borrowings.views.notify_borrowing_returned.delay")
     @patch("borrowings.views.notify_overdue_fine_created.delay")
@@ -86,7 +95,7 @@ class BorrowingAPITests(APITestCase):
         self,
         mock_checkout,
         mock_notify_fine,
-        mock_notify_return,
+        mock_notify_returned,
     ):
         mock_session = MagicMock()
         mock_session.id = "fine_session"
@@ -98,27 +107,21 @@ class BorrowingAPITests(APITestCase):
             reverse("borrowings-list"),
             {
                 "book": self.book.id,
-                "expected_return_date": ((date.today() + timedelta(days=1))
+                "expected_return_date": (
+                    date.today() + timedelta(days=1)
                 ).isoformat(),
             },
         )
 
-        print(create_response.status_code)
-        print(create_response.data)
-
         borrowing = Borrowing.objects.get(id=create_response.data["id"])
+
+        # make it overdue
         borrowing.expected_return_date = date.today() - timedelta(days=2)
         borrowing.save()
 
-
-
-        borrowing_id = create_response.data["id"]
-
-
-
         return_url = reverse(
             "borrowings-return-book",
-            args=[borrowing_id],
+            args=[borrowing.id],
         )
 
         response = self.client.post(return_url)
@@ -131,10 +134,17 @@ class BorrowingAPITests(APITestCase):
             ).exists()
         )
 
+        mock_checkout.assert_called()
+
+
+    # =====================================================
+    # BLOCK BORROWING IF PENDING PAYMENT EXISTS
+    # =====================================================
+
     @patch("borrowings.views.create_checkout_session")
     def test_cannot_create_borrowing_when_pending_payment_exists(
-            self,
-            mock_checkout,
+        self,
+        mock_checkout,
     ):
         mock_session = MagicMock()
         mock_session.id = "session_123"
@@ -146,7 +156,7 @@ class BorrowingAPITests(APITestCase):
         payload = {
             "book": self.book.id,
             "expected_return_date": (
-                    date.today() + timedelta(days=3)
+                date.today() + timedelta(days=3)
             ).isoformat(),
         }
 
@@ -158,7 +168,71 @@ class BorrowingAPITests(APITestCase):
         second_response = self.client.post(url, payload)
 
         self.assertEqual(second_response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn(
-            "pending",
-            str(second_response.data).lower()
+        self.assertIn("pending", str(second_response.data).lower())
+
+
+# =====================================================
+# QUERYSET TESTS
+# =====================================================
+
+class BorrowingQuerysetTests(APITestCase):
+
+    def setUp(self):
+        self.user1 = User.objects.create_user(
+            email="user1@example.com",
+            password="password123",
         )
+
+        self.user2 = User.objects.create_user(
+            email="user2@example.com",
+            password="password123",
+        )
+
+        self.staff = User.objects.create_user(
+            email="admin@example.com",
+            password="password123",
+            is_staff=True,
+        )
+
+        self.book = Book.objects.create(
+            title="Test Book",
+            author="Author",
+            cover=Book.CoverType.SOFT,
+            inventory=5,
+            daily_fee=Decimal("5.00"),
+        )
+
+        self.borrowing1 = Borrowing.objects.create(
+            user=self.user1,
+            book=self.book,
+            expected_return_date=date.today() + timedelta(days=3),
+        )
+
+        self.borrowing2 = Borrowing.objects.create(
+            user=self.user2,
+            book=self.book,
+            expected_return_date=date.today() + timedelta(days=3),
+        )
+
+    def authenticate(self, user):
+        token = self.client.post(
+            reverse("token-obtain"),
+            {"email": user.email, "password": "password123"},
+        ).data["access"]
+
+        self.client.credentials(HTTP_AUTHORIZATION=f"Authorize {token}")
+
+    def test_user_sees_only_own_borrowings(self):
+        self.authenticate(self.user1)
+
+        response = self.client.get(reverse("borrowings-list"))
+
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]["id"], self.borrowing1.id)
+
+    def test_staff_sees_all_borrowings(self):
+        self.authenticate(self.staff)
+
+        response = self.client.get(reverse("borrowings-list"))
+
+        self.assertEqual(len(response.data), 2)

@@ -5,6 +5,7 @@ from django.db import transaction
 from django.utils.timezone import now
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
+from rest_framework.exceptions import APIException
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
@@ -82,10 +83,13 @@ class BorrowingViewSet(viewsets.ModelViewSet):
 
             amount = int(book.daily_fee * Decimal("100"))
 
-            session = create_checkout_session(
-                borrowing=borrowing,
-                amount=amount,
-            )
+            try:
+                session = create_checkout_session(
+                    borrowing=borrowing,
+                    amount=amount,
+                )
+            except Exception:
+                raise APIException("Payment provider error")
 
             Payment.objects.create(
                 borrowing=borrowing,
