@@ -155,6 +155,14 @@ REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
 
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Library Service API",
+    "DESCRIPTION": "Online library management system with borrowings, payments and notifications.",
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+}
+
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
