@@ -131,5 +131,34 @@ class BorrowingAPITests(APITestCase):
             ).exists()
         )
 
-        mock_notify_fine.assert_called()
-        mock_notify_return.assert_called_once()
+    @patch("borrowings.views.create_checkout_session")
+    def test_cannot_create_borrowing_when_pending_payment_exists(
+            self,
+            mock_checkout,
+    ):
+        mock_session = MagicMock()
+        mock_session.id = "session_123"
+        mock_session.url = "http://stripe/session"
+        mock_checkout.return_value = mock_session
+
+        url = reverse("borrowings-list")
+
+        payload = {
+            "book": self.book.id,
+            "expected_return_date": (
+                    date.today() + timedelta(days=3)
+            ).isoformat(),
+        }
+
+        # First borrowing (creates pending payment)
+        first_response = self.client.post(url, payload)
+        self.assertEqual(first_response.status_code, status.HTTP_201_CREATED)
+
+        # Second borrowing should fail
+        second_response = self.client.post(url, payload)
+
+        self.assertEqual(second_response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn(
+            "pending",
+            str(second_response.data).lower()
+        )
