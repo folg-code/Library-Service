@@ -77,3 +77,49 @@ class BorrowingAPITests(APITestCase):
 
         mock_checkout.assert_called_once()
         mock_notify.assert_called_once()
+
+
+    @patch("borrowings.views.notify_borrowing_returned.delay")
+    @patch("borrowings.views.notify_overdue_fine_created.delay")
+    @patch("borrowings.views.create_checkout_session")
+    def test_return_overdue_creates_fine(
+        self,
+        mock_checkout,
+        mock_notify_fine,
+        mock_notify_return,
+    ):
+        mock_session = MagicMock()
+        mock_session.id = "fine_session"
+        mock_session.url = "http://stripe/fine"
+        mock_checkout.return_value = mock_session
+
+        # create borrowing first
+        create_response = self.client.post(
+            reverse("borrowings-list"),
+            {
+                "book": self.book.id,
+                "expected_return_date": (
+                    date.today() - timedelta(days=2)
+                ).isoformat(),
+            },
+        )
+
+        borrowing_id = create_response.data["id"]
+
+        return_url = reverse(
+            "borrowings-return-book",
+            args=[borrowing_id],
+        )
+
+        response = self.client.post(return_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.assertTrue(
+            Payment.objects.filter(
+                type=Payment.Type.FINE
+            ).exists()
+        )
+
+        mock_notify_fine.assert_called()
+        mock_notify_return.assert_called_once()
