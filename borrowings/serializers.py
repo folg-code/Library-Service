@@ -42,22 +42,26 @@ class BorrowingCreateSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         book: Book = attrs["book"]
-        user = self.context["request"].user
 
         if book.inventory <= 0:
             raise serializers.ValidationError(
                 "Book is not available."
             )
 
-        has_pending_payment = Payment.objects.filter(
-            borrowing__user=user,
-            status=Payment.Status.PENDING
-        ).exists()
+        request = self.context.get("request")
 
-        if has_pending_payment:
-            raise serializers.ValidationError(
-                "You have pending payments. Complete them before borrowing new books."
-            )
+        if request:
+            user = request.user
+
+            has_pending_payment = Payment.objects.filter(
+                borrowing__user=user,
+                status=Payment.Status.PENDING,
+            ).exists()
+
+            if has_pending_payment:
+                raise serializers.ValidationError(
+                    "You have pending payments. Complete them before borrowing new books."
+                )
 
         return attrs
 
