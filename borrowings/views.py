@@ -6,6 +6,7 @@ from django.db import transaction
 from django.utils.timezone import now
 from rest_framework import viewsets, status, mixins
 from rest_framework.decorators import action
+from rest_framework.exceptions import APIException
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
@@ -57,6 +58,18 @@ class BorrowingViewSet(
             return BorrowingReturnSerializer
         return BorrowingReadSerializer
 
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+
+        read_serializer = BorrowingReadSerializer(
+            serializer.instance,
+            context=self.get_serializer_context(),
+        )
+
+        return Response(read_serializer.data, status=status.HTTP_201_CREATED)
+
     def perform_create(self, serializer):
         with transaction.atomic():
             book = Book.objects.select_for_update().get(
@@ -76,10 +89,13 @@ class BorrowingViewSet(
 
             amount = int(book.daily_fee * Decimal("100"))
 
-            session = create_checkout_session(
-                borrowing=borrowing,
-                amount=amount,
-            )
+            try:
+                session = create_checkout_session(
+                    borrowing=borrowing,
+                    amount=amount,
+                )
+            except Exception:
+                raise APIException("Payment provider error")
 
             Payment.objects.create(
                 borrowing=borrowing,
