@@ -5,7 +5,7 @@ from django.http import HttpResponse
 from django.views import View
 
 from .models import Payment
-from notifications.tasks import notify, notify_payment_completed
+from notifications.tasks import notify_payment_completed
 
 
 class StripeWebhookView(View):
@@ -43,7 +43,6 @@ class StripeWebhookView(View):
         if not payment:
             return
 
-        # Idempotency guard
         if payment.status == Payment.Status.PAID:
             return
 

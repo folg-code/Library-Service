@@ -29,3 +29,4 @@ def create_checkout_session(*, borrowing, amount):
     )
 
     return session
+

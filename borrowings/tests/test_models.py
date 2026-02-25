@@ -8,6 +8,7 @@ from django.test import TestCase
 from books.models import Book
 from borrowings.models import Borrowing
 
+
 class BorrowingModelTests(TestCase):
 
     def setUp(self):

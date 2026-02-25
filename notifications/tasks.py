@@ -15,6 +15,7 @@ from .services import send_telegram_message
 def notify(text: str) -> None:
     send_telegram_message(text)
 
+
 @shared_task(
     bind=True,
     autoretry_for=(Exception,),
@@ -46,6 +47,7 @@ def notify_payment_completed(self, payment_id: int) -> None:
 
     send_telegram_message(message)
 
+
 @shared_task(
     bind=True,
     autoretry_for=(Exception,),
@@ -72,6 +74,7 @@ def notify_borrowing_created(self, borrowing_id: int) -> None:
     )
 
     send_telegram_message(message)
+
 
 @shared_task(
     bind=True,
@@ -125,6 +128,7 @@ def notify_overdue_fine_created(self, payment_id: int) -> None:
     )
 
     send_telegram_message(message)
+
 
 @shared_task(
     bind=True,

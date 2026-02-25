@@ -3,7 +3,6 @@ from decimal import Decimal
 from unittest.mock import patch
 
 from django.test import TestCase
-from django.utils.timezone import now
 
 from users.models import User
 from books.models import Book

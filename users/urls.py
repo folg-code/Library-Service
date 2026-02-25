@@ -10,6 +10,12 @@ router = DefaultRouter()
 router.register("", UserViewSet, basename="users")
 
 urlpatterns = [
-    path("token/", PublicEmailTokenObtainPairView.as_view(), name="token-obtain"),
-    path("token/refresh/", PublicTokenRefreshView.as_view(), name="token-refresh"),
+    path("token/",
+         PublicEmailTokenObtainPairView.as_view(),
+         name="token-obtain"
+         ),
+    path("token/refresh/",
+         PublicTokenRefreshView.as_view(),
+         name="token-refresh"
+         ),
 ] + router.urls

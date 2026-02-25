@@ -10,7 +10,11 @@ from rest_framework.exceptions import APIException
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from notifications.tasks import  notify_borrowing_created, notify_borrowing_returned, notify_overdue_fine_created
+from notifications.tasks import (
+    notify_borrowing_created,
+    notify_borrowing_returned,
+    notify_overdue_fine_created
+)
 from .models import Borrowing
 from .serializers import (
     BorrowingReadSerializer,
@@ -111,7 +115,6 @@ class BorrowingViewSet(
 
     @action(methods=["post"], detail=True, url_path="return")
     def return_book(self, request, pk=None):
-
 
         borrowing = self.get_object()
         serializer = self.get_serializer(borrowing, data=request.data)
