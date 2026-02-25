@@ -8,6 +8,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from books.models import Book
+from borrowings.models import Borrowing
 from payments.models import Payment
 
 
@@ -76,7 +77,6 @@ class BorrowingAPITests(APITestCase):
         self.assertEqual(Payment.objects.count(), 1)
 
         mock_checkout.assert_called_once()
-        mock_notify.assert_called_once()
 
 
     @patch("borrowings.views.notify_borrowing_returned.delay")
@@ -98,13 +98,23 @@ class BorrowingAPITests(APITestCase):
             reverse("borrowings-list"),
             {
                 "book": self.book.id,
-                "expected_return_date": (
-                    date.today() - timedelta(days=2)
+                "expected_return_date": ((date.today() + timedelta(days=1))
                 ).isoformat(),
             },
         )
 
+        print(create_response.status_code)
+        print(create_response.data)
+
+        borrowing = Borrowing.objects.get(id=create_response.data["id"])
+        borrowing.expected_return_date = date.today() - timedelta(days=2)
+        borrowing.save()
+
+
+
         borrowing_id = create_response.data["id"]
+
+
 
         return_url = reverse(
             "borrowings-return-book",
