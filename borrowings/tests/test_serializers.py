@@ -12,6 +12,7 @@ from borrowings.serializers import (
     BorrowingCreateSerializer,
     BorrowingReturnSerializer,
 )
+from rest_framework.test import APIRequestFactory
 
 
 class BorrowingReadSerializerTests(TestCase):
@@ -37,11 +38,9 @@ class BorrowingReadSerializerTests(TestCase):
             expected_return_date=date.today() + timedelta(days=5),
         )
 
-
     def test_is_active_is_true_when_not_returned(self):
         serializer = BorrowingReadSerializer(self.borrowing)
         self.assertTrue(serializer.data["is_active"])
-
 
 
 class BorrowingCreateSerializerTests(TestCase):
@@ -61,13 +60,20 @@ class BorrowingCreateSerializerTests(TestCase):
             daily_fee=Decimal("1.50"),
         )
 
+        factory = APIRequestFactory()
+        self.request = factory.post("/")
+        self.request.user = self.user
+
     def test_create_serializer_valid_data(self):
         data = {
             "book": self.book.id,
             "expected_return_date": (now().date() + timedelta(days=3)).isoformat(),
         }
 
-        serializer = BorrowingCreateSerializer(data=data)
+        serializer = BorrowingCreateSerializer(
+            data=data,
+            context={"request": self.request}
+        )
         self.assertTrue(serializer.is_valid(), serializer.errors)
 
     def test_expected_return_date_must_be_in_future(self):
@@ -76,7 +82,10 @@ class BorrowingCreateSerializerTests(TestCase):
             "expected_return_date": now().date().isoformat(),
         }
 
-        serializer = BorrowingCreateSerializer(data=data)
+        serializer = BorrowingCreateSerializer(
+            data=data,
+            context={"request": self.request}
+        )
         self.assertFalse(serializer.is_valid())
         self.assertIn("expected_return_date", serializer.errors)
 
@@ -89,7 +98,10 @@ class BorrowingCreateSerializerTests(TestCase):
             "expected_return_date": (now().date() + timedelta(days=3)).isoformat(),
         }
 
-        serializer = BorrowingCreateSerializer(data=data)
+        serializer = BorrowingCreateSerializer(
+            data=data,
+            context={"request": self.request}
+        )
         self.assertFalse(serializer.is_valid())
         self.assertIn("Book is not available.", str(serializer.errors))
 
