@@ -49,19 +49,23 @@ class PaymentSuccessView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        if payment.status != Payment.Status.PAID:
-            payment.status = Payment.Status.PAID
-            payment.save(update_fields=["status"])
-
         return Response(
-                {"detail": "Payment confirmed"},
-                status=status.HTTP_200_OK,
-            )
-
-
+            {
+                "status": payment.status,
+                "detail": (
+                    "Payment confirmed"
+                    if payment.status == Payment.Status.PAID
+                    else "Payment not completed yet"
+                ),
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 class PaymentCancelView(APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
     def get(self, request):
         return Response(
             {"detail": "Payment was cancelled"},
