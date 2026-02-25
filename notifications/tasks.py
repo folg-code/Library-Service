@@ -21,7 +21,7 @@ def notify(text: str) -> None:
     retry_backoff=True,
     retry_kwargs={"max_retries": 5},
 )
-def notify_payment_completed(payment_id: int) -> None:
+def notify_payment_completed(self, payment_id: int) -> None:
     payment = (
         Payment.objects
         .select_related("borrowing", "borrowing__user")
@@ -52,7 +52,7 @@ def notify_payment_completed(payment_id: int) -> None:
     retry_backoff=True,
     retry_kwargs={"max_retries": 5},
 )
-def notify_borrowing_created(borrowing_id: int) -> None:
+def notify_borrowing_created(self, borrowing_id: int) -> None:
     borrowing = (
         Borrowing.objects
         .select_related("book", "user")
@@ -79,7 +79,7 @@ def notify_borrowing_created(borrowing_id: int) -> None:
     retry_backoff=True,
     retry_kwargs={"max_retries": 5},
 )
-def notify_borrowing_returned(borrowing_id: int) -> None:
+def notify_borrowing_returned(self, borrowing_id: int) -> None:
     borrowing = (
         Borrowing.objects
         .select_related("book", "user")
@@ -106,7 +106,7 @@ def notify_borrowing_returned(borrowing_id: int) -> None:
     retry_backoff=True,
     retry_kwargs={"max_retries": 5},
 )
-def notify_overdue_fine_created(payment_id: int) -> None:
+def notify_overdue_fine_created(self, payment_id: int) -> None:
     payment = (
         Payment.objects
         .select_related("borrowing", "borrowing__book", "borrowing__user")
