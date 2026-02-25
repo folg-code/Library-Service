@@ -26,6 +26,7 @@ class BorrowingReadSerializer(serializers.ModelSerializer):
 
 
 class BorrowingCreateSerializer(serializers.ModelSerializer):
+
     class Meta:
         model = Borrowing
         fields = (
@@ -42,42 +43,26 @@ class BorrowingCreateSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         book: Book = attrs["book"]
-        user = self.context["request"].user
 
         if book.inventory <= 0:
             raise serializers.ValidationError(
                 "Book is not available."
             )
 
-        has_pending_payment = Payment.objects.filter(
-            borrowing__user=user,
-            status=Payment.Status.PENDING
-        ).exists()
+        request = self.context.get("request")
+        if request:
+            user = request.user
+            has_pending_payment = Payment.objects.filter(
+                borrowing__user=user,
+                status=Payment.Status.PENDING,
+            ).exists()
 
-        if has_pending_payment:
-            raise serializers.ValidationError(
-                "You have pending payments. Complete them before borrowing new books."
-            )
+            if has_pending_payment:
+                raise serializers.ValidationError(
+                    "You have pending payments. Complete them before borrowing new books."
+                )
 
         return attrs
-
-    @transaction.atomic
-    def create(self, validated_data):
-        book = validated_data["book"]
-        user = self.context["request"].user
-
-        book.inventory -= 1
-        book.save(update_fields=["inventory"])
-
-        borrowing = Borrowing.objects.create(
-            user=user,
-            borrow_date=now().date(),
-            **validated_data
-        )
-
-        notify_borrowing_created.delay(borrowing.id)
-
-        return borrowing
 
 
 class BorrowingReturnSerializer(serializers.ModelSerializer):
