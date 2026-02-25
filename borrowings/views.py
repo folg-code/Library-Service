@@ -1,9 +1,10 @@
 from decimal import Decimal
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils.timezone import now
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, mixins
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -22,7 +23,12 @@ from payments.services import create_checkout_session
 from .services import calculate_overdue_days
 
 
-class BorrowingViewSet(viewsets.ModelViewSet):
+class BorrowingViewSet(
+    mixins.CreateModelMixin,
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    viewsets.GenericViewSet
+):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
@@ -58,7 +64,7 @@ class BorrowingViewSet(viewsets.ModelViewSet):
             )
 
             if book.inventory <= 0:
-                raise ValueError("Book is not available.")
+                raise ValidationError("Book is not available.")
 
             book.inventory -= 1
             book.save()
@@ -89,9 +95,14 @@ class BorrowingViewSet(viewsets.ModelViewSet):
 
     @action(methods=["post"], detail=True, url_path="return")
     def return_book(self, request, pk=None):
+
+
         borrowing = self.get_object()
         serializer = self.get_serializer(borrowing, data=request.data)
         serializer.is_valid(raise_exception=True)
+
+        if borrowing.actual_return_date:
+            raise ValidationError("Book already returned.")
 
         with transaction.atomic():
             returned_date = now().date()
