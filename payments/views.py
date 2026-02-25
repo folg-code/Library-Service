@@ -1,5 +1,5 @@
 from rest_framework.viewsets import ReadOnlyModelViewSet
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -27,6 +27,9 @@ class PaymentsViewSet(ReadOnlyModelViewSet):
 
 
 class PaymentSuccessView(APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
     def get(self, request):
         session_id = request.query_params.get("session_id")
 
@@ -46,19 +49,23 @@ class PaymentSuccessView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        if payment.status == Payment.Status.PAID:
-            return Response(
-                {"detail": "Payment confirmed"},
-                status=status.HTTP_200_OK,
-            )
-
         return Response(
-            {"detail": "Payment not completed yet"},
+            {
+                "status": payment.status,
+                "detail": (
+                    "Payment confirmed"
+                    if payment.status == Payment.Status.PAID
+                    else "Payment not completed yet"
+                ),
+            },
             status=status.HTTP_200_OK,
         )
 
 
 class PaymentCancelView(APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
     def get(self, request):
         return Response(
             {"detail": "Payment was cancelled"},
