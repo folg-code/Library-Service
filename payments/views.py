@@ -99,8 +99,8 @@ class PaymentsViewSet(ReadOnlyModelViewSet):
     ],
 )
 class PaymentSuccessView(APIView):
-    authentication_classes = []
     permission_classes = [AllowAny]
+    authentication_classes = []
 
     def get(self, request):
         session_id = request.query_params.get("session_id")
@@ -121,15 +121,12 @@ class PaymentSuccessView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
+        if payment.status != Payment.Status.PAID:
+            payment.status = Payment.Status.PAID
+            payment.save(update_fields=["status"])
+
         return Response(
-            {
-                "status": payment.status,
-                "detail": (
-                    "Payment confirmed"
-                    if payment.status == Payment.Status.PAID
-                    else "Payment not completed yet"
-                ),
-            },
+            {"detail": "Payment confirmed"},
             status=status.HTTP_200_OK,
         )
 
