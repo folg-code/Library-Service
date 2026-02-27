@@ -5,3 +5,7 @@ python-dotenv
 django-filter
 drf-spectacular
 psycopg2-binary
+gunicorn
+stripe
+celery
+redis
